@@ -1,0 +1,7 @@
+[package]
+name = "sync"
+version = "0.1.0"
+authors = ["Y0hy0h"]
+edition = "2018"
+
+[dependencies]
