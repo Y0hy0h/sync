@@ -170,11 +170,3 @@ impl std::fmt::Debug for FilePath {
 pub enum FilePathCreationError {
     MissingFileName,
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
