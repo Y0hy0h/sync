@@ -16,11 +16,11 @@ fn main() {
     // Insert some items.
     let path1: Path = vec!["folder", "item1"].into();
     let item1 = "store me";
-    local.set(path1.clone(), item1);
+    local.insert_item(path1.clone(), item1);
 
     let path2: Path = vec!["folder", "item2"].into();
     let item2 = "store me, too";
-    remote.set(path2.clone(), item2);
+    remote.insert_item(path2.clone(), item2);
 
     // Synchronize the databases.
     db.sync(&vec![].into());
@@ -36,36 +36,50 @@ fn main() {
     assert_eq!(stored_locally, stored_remotely);
 }
 
-struct MemoryDb<'a, T> {
-    items: &'a RwLock<HashMap<Path, Rc<T>>>,
-}
-
-impl<'a, T> MemoryDb<'a, T> {
-    pub fn with(items: &'a RwLock<HashMap<Path, Rc<T>>>) -> Self {
-        Self { items }
-    }
-}
-
-impl<'a, T> Db<T> for MemoryDb<'a, T>
+struct MemoryDb<'a, T>
 where
     T: Clone,
 {
-    fn set(&mut self, path: Path, item: T) {
-        self.items.write().unwrap().insert(path, Rc::new(item));
+    items: &'a RwLock<HashMap<Path, Rc<T>>>,
+}
+
+impl<'a, T> MemoryDb<'a, T>
+where
+    T: Clone,
+{
+    pub fn with(items: &'a RwLock<HashMap<Path, Rc<T>>>) -> Self {
+        Self { items }
     }
 
-    fn get(&self, path: &Path) -> Option<T> {
-        self.items.read().unwrap().get(path).map(|rc| T::clone(rc))
+    pub fn insert_item(&mut self, path: Path, item: T) -> Option<Rc<T>> {
+        self.insert(path, Rc::new(item))
+    }
+}
+
+impl<'a, T> Db<Rc<T>> for MemoryDb<'a, T>
+where
+    T: Clone,
+{
+    fn set(&mut self, path: Path, item: Option<Rc<T>>) -> Option<Rc<T>> {
+        let mut db = self.items.write().unwrap();
+        match item {
+            Some(i) => db.insert(path, i),
+            None => db.remove(&path),
+        }
     }
 
-    type List = Vec<(Path, T)>;
+    fn get(&self, path: &Path) -> Option<Rc<T>> {
+        self.items.read().unwrap().get(path).map(|rc| rc.clone())
+    }
+
+    type List = Vec<(Path, Rc<T>)>;
     fn list(&self, sync_path: &Path) -> Self::List {
         self.items
             .read()
             .unwrap()
             .iter()
             .filter(|(path, _)| sync_path.is_parent_of(path))
-            .map(|(path, item)| (path.clone(), T::clone(item)))
+            .map(|(path, item)| (path.clone(), item.clone()))
             .collect()
     }
 }

@@ -29,20 +29,28 @@ where
 
         for (path, item) in self.local.list(sync_path) {
             if self.remote.get(&path).as_ref() != Some(&item) {
-                self.remote.set(path, item.clone());
+                self.remote.insert(path, item.clone());
             }
         }
 
         for (path, item) in remotes {
             if self.local.get(&path).as_ref() != Some(&item) {
-                self.local.set(path, item.clone());
+                self.local.insert(path, item.clone());
             }
         }
     }
 }
 
 pub trait Db<T> {
-    fn set(&mut self, path: Path, item: T);
+    fn set(&mut self, path: Path, item: Option<T>) -> Option<T>;
+
+    fn insert(&mut self, path: Path, item: T) -> Option<T> {
+        self.set(path, Some(item))
+    }
+
+    fn remove(&mut self, path: Path) -> Option<T> {
+        self.set(path, None)
+    }
 
     fn get(&self, path: &Path) -> Option<T>;
 
