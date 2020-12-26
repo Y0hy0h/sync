@@ -6,12 +6,14 @@ use sync::Db;
 use sync::{Path, SyncDb};
 
 fn main() {
+    // Create our databases.
     let local_items = RwLock::new(HashMap::new());
     let mut local = MemoryDb::with(&local_items);
     let remote_items = RwLock::new(HashMap::new());
     let mut remote = MemoryDb::with(&remote_items);
     let mut db = SyncDb::new(MemoryDb::with(&local_items), MemoryDb::with(&remote_items));
 
+    // Insert some items.
     let path1: Path = vec!["folder", "item1"].into();
     let item1 = "store me";
     local.set(path1.clone(), item1);
@@ -20,8 +22,10 @@ fn main() {
     let item2 = "store me, too";
     remote.set(path2.clone(), item2);
 
+    // Synchronize the databases.
     db.sync(&vec![].into());
 
+    // Look inside the databases.
     let folder_path = vec!["folder"].into();
     let mut stored_locally = local.list(&folder_path);
     let mut stored_remotely = remote.list(&folder_path);
