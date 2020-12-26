@@ -2,6 +2,8 @@ use core::convert::TryFrom;
 use core::marker::PhantomData;
 use std::collections::HashSet;
 
+pub mod memory_db;
+
 pub struct SyncDb<T, L, R>
 where
     L: Db<T>,
@@ -88,16 +90,23 @@ pub struct FolderPath {
     parts: Vec<String>,
 }
 
-impl From<Vec<&'static str>> for FolderPath {
-    fn from(parts: Vec<&'static str>) -> Self {
+impl<S> From<Vec<S>> for FolderPath
+where
+    S: Into<String>,
+{
+    fn from(parts: Vec<S>) -> Self {
         FolderPath {
-            parts: parts.into_iter().map(|part| part.to_string()).collect(),
+            parts: parts.into_iter().map(|part| part.into()).collect(),
         }
     }
 }
 
 impl FolderPath {
-    pub fn contains(&self, other: &FolderPath) -> bool {
+    pub fn root() -> Self {
+        FolderPath { parts: vec![] }
+    }
+
+    pub fn contains(&self, other: &Self) -> bool {
         self.parts
             .iter()
             .zip(other.parts.iter())

@@ -5,3 +5,4 @@ authors = ["Y0hy0h"]
 edition = "2018"
 
 [dependencies]
+proptest = "0.10.1"
