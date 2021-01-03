@@ -33,7 +33,7 @@ proptest! {
 
 prop_compose! {
     fn items()
-            (entries in proptest::collection::vec(item(), 0..100))
+            (entries in proptest::collection::vec(item(), 0..10))
             -> Vec<(FilePath, String)> {
         entries
     }
