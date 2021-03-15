@@ -5,4 +5,8 @@ authors = ["Y0hy0h"]
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1.42"
+
+[dev-dependencies]
 proptest = "0.10.1"
+smol = "1.2.5"

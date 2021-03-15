@@ -7,27 +7,30 @@ use sync::{Db, Depth, FilePath, FolderPath, SyncDb};
 proptest! {
     #[test]
     fn makes_repositories_consistent(local_items in items(), remote_items in items()) {
+    smol::block_on(async {
         let mut local = MemoryDb::new();
         for (path, item) in local_items {
-            local.insert(path, Rc::new(item));
+            local.insert(path, Rc::new(item)).await;
         }
 
         let mut remote = MemoryDb::new();
         for (path, item) in remote_items{
-            remote.insert(path, Rc::new(item));
+            remote.insert(path, Rc::new(item)).await;
         }
 
         let mut sync = SyncDb::new(local.clone(), remote.clone());
 
         let root_folder = FolderPath::root();
-        sync.sync_folder(&Depth::Recursive, &root_folder);
+            sync.sync_folder(&Depth::Recursive, &root_folder).await;
 
-        let mut stored_locally = local.list(&Depth::Recursive, &root_folder);
-        let mut stored_remotely = remote.list(&Depth::Recursive, &root_folder);
+        let mut stored_locally = local.list(&Depth::Recursive, &root_folder).await;
+        let mut stored_remotely =remote.list(&Depth::Recursive, &root_folder).await;
 
         stored_locally.sort_by_key(|(path, _)| path.clone());
         stored_remotely.sort_by_key(|(path, _)| path.clone());
-        assert_eq!(stored_locally, stored_remotely);
+        prop_assert_eq!(stored_locally, stored_remotely);
+        Ok(())
+        })?
     }
 }
 

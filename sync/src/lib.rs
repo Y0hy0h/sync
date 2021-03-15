@@ -2,6 +2,8 @@ use core::convert::TryFrom;
 use core::marker::PhantomData;
 use std::collections::HashSet;
 
+use async_trait::async_trait;
+
 pub mod memory_db;
 
 pub struct SyncDb<T, L, R>
@@ -28,56 +30,64 @@ where
         }
     }
 
-    pub fn sync_folder(&mut self, depth: &Depth, sync_path: &FolderPath) {
+    pub async fn sync_folder(&mut self, depth: &Depth, sync_path: &FolderPath) {
         let paths_to_sync: HashSet<FilePath> = self
             .local
             .list(depth, sync_path)
+            .await
             .into_iter()
-            .chain(self.remote.list(depth, sync_path).into_iter())
+            .chain(self.remote.list(depth, sync_path).await.into_iter())
             .map(|(path, _)| path)
             .collect();
 
         for path in paths_to_sync {
-            self.sync_file(path)
+            self.sync_file(path).await
         }
     }
 
-    pub fn sync_file(&mut self, sync_path: FilePath) {
-        let local = self.local.get(&sync_path);
-        let remote = self.remote.get(&sync_path);
+    pub async fn sync_file(&mut self, sync_path: FilePath) {
+        let local = self.local.get(&sync_path).await;
+        let remote = self.remote.get(&sync_path).await;
 
         match (local, remote) {
             (Some(l), Some(r)) => {
                 if l != r {
-                    self.local.insert(sync_path, r);
+                    self.local.insert(sync_path, r).await;
                 }
             }
             (Some(l), None) => {
-                self.remote.insert(sync_path, l);
+                self.remote.insert(sync_path, l).await;
             }
             (None, Some(r)) => {
-                self.local.insert(sync_path, r);
+                self.local.insert(sync_path, r).await;
             }
-            _ => (),
+            (None, None) => (),
         }
     }
 }
 
+#[async_trait(?Send)]
 pub trait Db<T> {
-    fn set(&mut self, path: FilePath, item: Option<T>) -> Option<T>;
+    async fn set(&mut self, path: FilePath, item: Option<T>) -> Option<T>;
 
-    fn insert(&mut self, path: FilePath, item: T) -> Option<T> {
-        self.set(path, Some(item))
+    async fn insert(&mut self, path: FilePath, item: T) -> Option<T>
+    where
+        T: 'async_trait,
+    {
+        self.set(path, Some(item)).await
     }
 
-    fn remove(&mut self, path: FilePath) -> Option<T> {
-        self.set(path, None)
+    async fn remove(&mut self, path: FilePath) -> Option<T>
+    where
+        T: 'async_trait,
+    {
+        self.set(path, None).await
     }
 
-    fn get(&self, path: &FilePath) -> Option<T>;
+    async fn get(&self, path: &FilePath) -> Option<T>;
 
     type List: IntoIterator<Item = (FilePath, T)>;
-    fn list(&self, depth: &Depth, path: &FolderPath) -> Self::List;
+    async fn list(&self, depth: &Depth, path: &FolderPath) -> Self::List;
 }
 
 pub enum Depth {
@@ -92,11 +102,11 @@ pub struct FolderPath {
 
 impl<S> From<Vec<S>> for FolderPath
 where
-    S: Into<String>,
+    S: ToString,
 {
     fn from(parts: Vec<S>) -> Self {
         FolderPath {
-            parts: parts.into_iter().map(|part| part.into()).collect(),
+            parts: parts.into_iter().map(|part| part.to_string()).collect(),
         }
     }
 }
@@ -140,10 +150,13 @@ impl FilePath {
     }
 }
 
-impl TryFrom<Vec<&'static str>> for FilePath {
+impl<S> TryFrom<Vec<S>> for FilePath
+where
+    S: ToString,
+{
     type Error = FilePathCreationError;
 
-    fn try_from(mut parts: Vec<&'static str>) -> Result<Self, Self::Error> {
+    fn try_from(mut parts: Vec<S>) -> Result<Self, Self::Error> {
         if parts.is_empty() {
             return Err(FilePathCreationError::MissingFileName);
         }
@@ -167,6 +180,7 @@ impl std::fmt::Debug for FilePath {
     }
 }
 
+#[derive(Debug)]
 pub enum FilePathCreationError {
     MissingFileName,
 }
